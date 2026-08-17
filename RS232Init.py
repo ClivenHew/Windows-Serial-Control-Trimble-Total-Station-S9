@@ -56,28 +56,32 @@ trimbleInitSequence8 = [
 ]
 
 trimbleInitSequence9 = [
-    0x13, 0x0B, 0x00, 0x01, 0x02, 0x99, 0x40, 0x01, 0x01, 0x02, 0x01, 0xC0
+    0x13, 0x08, 0x00, 0x01, 0x02, 0xA7, 0x41, 0x02, 0xC0
 ]
 
 trimbleInitSequence10 = [
-    0x13, 0x07, 0x00, 0x01, 0x02, 0xAE, 0x40, 0xC0
+    0x13, 0x0B, 0x00, 0x01, 0x02, 0x99, 0x40, 0x01, 0x01, 0x02, 0x01, 0xC0
 ]
 
 trimbleInitSequence11 = [
-    0x13, 0x07, 0x00, 0x01, 0x02, 0x9F, 0x40, 0xC0
+    0x13, 0x07, 0x00, 0x01, 0x02, 0xAE, 0x40, 0xC0
 ]
 
 trimbleInitSequence12 = [
-    0x13, 0x07, 0x00, 0x01, 0x02, 0xBD, 0x40, 0xC0
+    0x13, 0x07, 0x00, 0x01, 0x02, 0x9F, 0x40, 0xC0
 ]
 
 trimbleInitSequence13 = [
+    0x13, 0x07, 0x00, 0x01, 0x02, 0xBD, 0x40, 0xC0
+]
+
+trimbleInitSequence14 = [
     0x13, 0x09, 0x00, 0x01, 0x02, 0x87, 0x40, 0x00, 0x00, 0xC0
 ]
 
 def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchWindow, correctionValues, trimbleSerial):
     try:
-        initializationTimeout = 10
+        initializationTimeout = 15
         state = 0
         trimbleBuffer = bytearray()
 
@@ -899,7 +903,7 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                                 trimbleBuffer.clear()
                                 state = 130
                                 break
-                
+
 
                 #Initialization 9
                 case 130:
@@ -938,7 +942,7 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                             trimbleBuffer.extend(trimbleSerial.read(trimbleSerial.in_waiting))
 
                             #Listen for acknowledgement
-                            if b'\x12\x08\x00\x02\x01\x99\x80\x00\xC0' in trimbleBuffer:
+                            if b'\x12\x08\x00\x02\x01\xA7\x81\x00\xC0' in trimbleBuffer:
                                 print("Initialization 9 received.\n")
                                 log_data(trimbleBuffer, logFile)
                                 #Clear buffer
@@ -947,15 +951,12 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                                 break
                 
 
-                #Initialization 10: Get Correction Values
+                #Initialization 10
                 case 140:
                     print("Sending Initialization 10\n")
                     log_data(trimbleInitSequence10, logFile)
                     #Send data packet
                     trimbleSerial.write(bytes(trimbleInitSequence10))
-                    trimbleSerial.flush()
-
-                    responseHeader = (b"\x12\x1C\x00\x02\x01\xAE\x80\x00")
 
                     #Set start time to current time
                     initializationStartTime = time.monotonic()
@@ -975,6 +976,55 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                         #If elapsed time has exceeded 10 seconds
                         if elapsedTime > initializationTimeout:
                             print("Initialization 10 timed out.\n")
+                            log_data("Timeout waiting for expected response", logFile)
+                            log_data(trimbleBuffer, logFile)
+                            #Clear buffer
+                            trimbleBuffer.clear()
+                            return False
+                        
+                        #If there is data in the serial buffer
+                        if trimbleSerial.in_waiting > 0:
+                            #Read and append incoming data in array
+                            trimbleBuffer.extend(trimbleSerial.read(trimbleSerial.in_waiting))
+
+                            #Listen for acknowledgement
+                            if b'\x12\x08\x00\x02\x01\x99\x80\x00\xC0' in trimbleBuffer:
+                                print("Initialization 10 received.\n")
+                                log_data(trimbleBuffer, logFile)
+                                #Clear buffer
+                                trimbleBuffer.clear()
+                                state = 150
+                                break
+                
+
+                #Initialization 11: Get Correction Values
+                case 150:
+                    print("Sending Initialization 11\n")
+                    log_data(trimbleInitSequence11, logFile)
+                    #Send data packet
+                    trimbleSerial.write(bytes(trimbleInitSequence11))
+                    trimbleSerial.flush()
+
+                    responseHeader = (b"\x12\x1C\x00\x02\x01\xAE\x80\x00")
+
+                    #Set start time to current time
+                    initializationStartTime = time.monotonic()
+                    previousCountdown = 0
+
+                    while True:
+                        #Track the time taken
+                        elapsedTime = time.monotonic() - initializationStartTime
+                        #Don't allow tracked time to go below 0 seconds
+                        remainingTime = max(0, initializationTimeout - int(elapsedTime))
+
+                        #Print out the remaining time if it is a different value
+                        if remainingTime != previousCountdown:
+                            print(f"Initialization 11 timeout in: " f"{remainingTime:02d} seconds", end = "\n", flush = True)
+                            previousCountdown = remainingTime
+
+                        #If elapsed time has exceeded 10 seconds
+                        if elapsedTime > initializationTimeout:
+                            print("Initialization 11 timed out.\n")
                             log_data("Timeout waiting for expected response", logFile)
                             log_data(trimbleBuffer, logFile)
                             #Clear buffer
@@ -1040,20 +1090,20 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                         correctionValues["trackerCollimationVerticalAngle"] = (trackerCollimationVAInteger * 360.0 / 4_000_000)
                         correctionValues["trunnionAxis"] = (trunnionAxisInteger * 360.0 / 4_000_000)
 
-                        print("Initialization 10 received.\n")
+                        print("Initialization 11 received.\n")
                         log_data(trimbleBuffer, logFile)
                         #Clear buffer
                         trimbleBuffer.clear()
-                        state = 150
+                        state = 160
                         break
                 
 
-                #Initialization 11: Get current power source
-                case 150:
-                    print("Sending Initialization 11\n")
+                #Initialization 12: Get current power source
+                case 160:
+                    print("Sending Initialization 12\n")
 
-                    log_data(trimbleInitSequence11, logFile)
-                    trimbleSerial.write(bytes(trimbleInitSequence11))
+                    log_data(trimbleInitSequence12, logFile)
+                    trimbleSerial.write(bytes(trimbleInitSequence12))
                     trimbleSerial.flush()
 
                     responseHeader = b"\x12\x09\x00\x02\x01\x9F\x80\x00"
@@ -1088,54 +1138,8 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
 
                         log_data(trimbleBuffer, logFile)
                         trimbleBuffer.clear()
-                        state = 160
+                        state = 170
                         break
-
-                #Initialization 12
-                case 160:
-                    print("Sending Initialization 12\n")
-                    log_data(trimbleInitSequence12, logFile)
-                    #Send data packet
-                    trimbleSerial.write(bytes(trimbleInitSequence12))
-
-                    #Set start time to current time
-                    initializationStartTime = time.monotonic()
-                    previousCountdown = 0
-
-                    while True:
-                        #Track the time taken
-                        elapsedTime = time.monotonic() - initializationStartTime
-                        #Don't allow tracked time to go below 0 seconds
-                        remainingTime = max(0, initializationTimeout - int(elapsedTime))
-
-                        #Print out the remaining time if it is a different value
-                        if remainingTime != previousCountdown:
-                            print(f"Initialization 12 timeout in: " f"{remainingTime:02d} seconds", end = "\n", flush = True)
-                            previousCountdown = remainingTime
-
-                        #If elapsed time has exceeded 10 seconds
-                        if elapsedTime > initializationTimeout:
-                            print("Initialization 12 timed out.\n")
-                            log_data("Timeout waiting for expected response", logFile)
-                            log_data(trimbleBuffer, logFile)
-                            #Clear buffer
-                            trimbleBuffer.clear()
-                            return False
-                        
-                        #If there is data in the serial buffer
-                        if trimbleSerial.in_waiting > 0:
-                            #Read and append incoming data in array
-                            trimbleBuffer.extend(trimbleSerial.read(trimbleSerial.in_waiting))
-
-                            #Listen for acknowledgement
-                            if b'\x12\x0C\x00\x02\x01\xBD\x80\x00\xE8\x03\x00\x00\xC0' in trimbleBuffer:
-                                print("Initialization 12 received.\n")
-                                log_data(trimbleBuffer, logFile)
-                                #Clear buffer
-                                trimbleBuffer.clear()
-                                state = 170
-                                break
-                
 
                 #Initialization 13
                 case 170:
@@ -1174,8 +1178,54 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                             trimbleBuffer.extend(trimbleSerial.read(trimbleSerial.in_waiting))
 
                             #Listen for acknowledgement
-                            if b'\x12\x08\x00\x02\x01\x87\x80\x00\xC0' in trimbleBuffer:
+                            if b'\x12\x0C\x00\x02\x01\xBD\x80\x00\xE8\x03\x00\x00\xC0' in trimbleBuffer:
                                 print("Initialization 13 received.\n")
+                                log_data(trimbleBuffer, logFile)
+                                #Clear buffer
+                                trimbleBuffer.clear()
+                                state = 190
+                                break
+                
+
+                #Initialization 14
+                case 190:
+                    print("Sending Initialization 14\n")
+                    log_data(trimbleInitSequence14, logFile)
+                    #Send data packet
+                    trimbleSerial.write(bytes(trimbleInitSequence14))
+
+                    #Set start time to current time
+                    initializationStartTime = time.monotonic()
+                    previousCountdown = 0
+
+                    while True:
+                        #Track the time taken
+                        elapsedTime = time.monotonic() - initializationStartTime
+                        #Don't allow tracked time to go below 0 seconds
+                        remainingTime = max(0, initializationTimeout - int(elapsedTime))
+
+                        #Print out the remaining time if it is a different value
+                        if remainingTime != previousCountdown:
+                            print(f"Initialization 14 timeout in: " f"{remainingTime:02d} seconds", end = "\n", flush = True)
+                            previousCountdown = remainingTime
+
+                        #If elapsed time has exceeded 10 seconds
+                        if elapsedTime > initializationTimeout:
+                            print("Initialization 14 timed out.\n")
+                            log_data("Timeout waiting for expected response", logFile)
+                            log_data(trimbleBuffer, logFile)
+                            #Clear buffer
+                            trimbleBuffer.clear()
+                            return False
+                        
+                        #If there is data in the serial buffer
+                        if trimbleSerial.in_waiting > 0:
+                            #Read and append incoming data in array
+                            trimbleBuffer.extend(trimbleSerial.read(trimbleSerial.in_waiting))
+
+                            #Listen for acknowledgement
+                            if b'\x12\x08\x00\x02\x01\x87\x80\x00\xC0' in trimbleBuffer:
+                                print("Initialization 14 received.\n")
                                 #Set variables that connection is established
                                 status["trimbleConnection"] = True
                                 log_data(trimbleBuffer, logFile)
