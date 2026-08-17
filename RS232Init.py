@@ -75,7 +75,7 @@ trimbleInitSequence13 = [
     0x13, 0x09, 0x00, 0x01, 0x02, 0x87, 0x40, 0x00, 0x00, 0xC0
 ]
 
-def init_trimble(status, logFile, currentAngles, turnTotalStation, searchWindow, correctionValues, trimbleSerial):
+def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchWindow, correctionValues, trimbleSerial):
     try:
         initializationTimeout = 10
         state = 0
@@ -220,14 +220,20 @@ def init_trimble(status, logFile, currentAngles, turnTotalStation, searchWindow,
                                 break
                     
                 
-                #Device Authentication 2
+                                #Device Authentication 2
                 case 30:
                     print("Sending Device Authentication 2\n")
                     log_data(deviceAuthentication2, logFile)
-                    #Send handshake data packet
+                    #Send authentication 2 data packet
                     trimbleSerial.write(bytes(deviceAuthentication2))
+                    trimbleSerial.flush()
 
                     authentication2Received = False
+                    keepAliveCount = 0
+                    nextKeepAliveTime = None
+
+                    keepAlivePacket = b'\xFF\xC0'
+                    backgroundStreamHeader = b'\x02\x45\x00\x02\x01\x64'
 
                     #Set start time to current time
                     initializationStartTime = time.monotonic()
@@ -263,19 +269,63 @@ def init_trimble(status, logFile, currentAngles, turnTotalStation, searchWindow,
                                 print("Device Authentication 2 received.\n")
                                 authentication2Received = True
 
-                                # Remove data through the authentication frame.
+                                #Find the end of the authentication response
                                 end = trimbleBuffer.find(b'\xC0') + 1
+
+                                #Log the authentication response
+                                log_data(trimbleBuffer[:end], logFile)
+
+                                #Remove data through the authentication frame
                                 del trimbleBuffer[:end]
 
-                            #Once acknowledgement received, wait for stream of 0xFF 0xC0 before beginning challenge
-                            if (authentication2Received == True and b'\xFF\xC0' in trimbleBuffer):
-                                log_data(trimbleBuffer, logFile)
-                                #Clear buffer
-                                trimbleBuffer.clear()
-                                # SDK waited roughly 0.2 seconds after FF C0.
-                                time.sleep(0.25)
-                                state = 40
-                                break
+                                #Send the first keep-alive after approximately 2.7 seconds
+                                nextKeepAliveTime = time.monotonic() + 2.7
+
+                        #Once acknowledgement is received, send two keep-alive packets
+                        if authentication2Received == True and keepAliveCount < 2:
+                            if time.monotonic() >= nextKeepAliveTime:
+                                print(f"Sending Keep-Alive {keepAliveCount + 1}\n")
+                                log_data(keepAlivePacket, logFile)
+
+                                #Send keep-alive packet to the Trimble device
+                                trimbleSerial.write(keepAlivePacket)
+                                trimbleSerial.flush()
+
+                                keepAliveCount += 1
+
+                                #Send the next keep-alive after approximately 2.7 seconds
+                                nextKeepAliveTime = time.monotonic() + 2.7
+
+                        #Once both keep-alives are sent, wait for the background stream
+                        if authentication2Received == True and keepAliveCount == 2:
+                            streamStart = trimbleBuffer.find(backgroundStreamHeader)
+
+                            #If background stream header is found
+                            if streamStart != -1:
+                                #Find the end of the background stream packet
+                                streamEnd = trimbleBuffer.find(b'\xC0', streamStart)
+
+                                #If complete background stream packet is received
+                                if streamEnd != -1:
+                                    print("Initial background stream received.\n")
+
+                                    #Store the complete background stream packet
+                                    streamPacket = trimbleBuffer[streamStart:streamEnd + 1]
+
+                                    #Log the background stream packet
+                                    log_data(streamPacket, logFile)
+
+                                    #Remove data through the background stream packet
+                                    del trimbleBuffer[:streamEnd + 1]
+
+                                    #SDK waited approximately 1 second after receiving the background stream
+                                    time.sleep(1)
+
+                                    #Go to request challenge
+                                    state = 40
+                                    break
+
+                        time.sleep(0.001)
                 
 
                 #Request for Challenge

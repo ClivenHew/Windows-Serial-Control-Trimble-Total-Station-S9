@@ -1,7 +1,7 @@
 /*
   Arduino 2 (MKR WiFi 1010) - Arduino 1 <-> Laptop relay
   ---------------------------------------------------------
-  Serial   (USB CDC)   -> connects to the Laptop (COM14 in LaptopBridge.py)
+  Serial   (USB CDC)   -> connects to the Laptop (COM14 in RS232_SDKMain.py)
   Serial1  (hardware UART, pins 13/14) -> connects to Arduino 1
 
   Wiring (MKR WiFi 1010 pinout):
@@ -14,21 +14,28 @@
   logic level shifter on the RX/TX lines - 5V on an MKR's RX pin can damage it.
 */
 
-const long BAUD_RATE = 9600;  // Must match Arduino1's Serial1 speed and the Laptop's port speed (COM14)
+const unsigned long USB_BAUD_RATE = 115200;  // Matches RS232_SDKMain.py
+const unsigned long UART_BAUD_RATE = 9600;   // Must match Arduino 1 Serial1
+const byte MAX_BYTES_PER_PASS = 32;
 
 void setup() {
-  Serial.begin(BAUD_RATE);   // USB link to the Laptop
-  Serial1.begin(BAUD_RATE);  // Hardware UART link to Arduino 1
+  Serial.begin(USB_BAUD_RATE);   // USB CDC link to the laptop
+  Serial1.begin(UART_BAUD_RATE); // Hardware UART link to Arduino 1
 }
 
 void loop() {
-  // Arduino 1 -> Arduino 2 -> Laptop
-  while (Serial1.available()) {
-    Serial.write(Serial1.read());
+  // Limit each pass so traffic in one direction cannot starve the response.
+  for (byte count = 0; count < MAX_BYTES_PER_PASS && Serial1.available() > 0; count++) {
+    const int value = Serial1.read();
+    if (value >= 0) {
+      Serial.write((byte)value);   // Arduino 1 -> Arduino 2 -> laptop
+    }
   }
 
-  // Laptop -> Arduino 2 -> Arduino 1
-  while (Serial.available()) {
-    Serial1.write(Serial.read());
+  for (byte count = 0; count < MAX_BYTES_PER_PASS && Serial.available() > 0; count++) {
+    const int value = Serial.read();
+    if (value >= 0) {
+      Serial1.write((byte)value);  // Laptop -> Arduino 2 -> Arduino 1
+    }
   }
 }

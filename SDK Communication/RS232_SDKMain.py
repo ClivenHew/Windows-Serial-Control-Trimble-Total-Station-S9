@@ -1,219 +1,77 @@
+import serial
 import time
 from datetime import datetime
-from pathlib import Path
 
-import serial
+# --- Port configuration ---
+ARDUINO2_PORT = 'COM14'      # Arduino 2 (relay from Arduino 1 / SDK chain)
+TOTAL_STATION_PORT = 'COM6'  # Leica total station
+ARDUINO2_BAUD_RATE = 9600    # Must match the Arduino2 sketch
+TOTAL_STATION_BAUD_RATE = 115200
 
+with serial.Serial(ARDUINO2_PORT, baudrate=ARDUINO2_BAUD_RATE, timeout=1) as arduinoSerial, \
+     serial.Serial(TOTAL_STATION_PORT, baudrate=TOTAL_STATION_BAUD_RATE, timeout=1) as totalStationSerial:
 
-ARDUINO2_PORT = "COM14"
-TOTAL_STATION_PORT = "COM6"
+    status = "0"
 
-BAUD_RATE = 9600
-
-# At 9600 baud, one 8-N-1 byte takes approximately 1.04 ms.
-# Ten milliseconds without another byte marks the end of the buffer.
-BUFFER_GAP = 0.010
-
-POLL_INTERVAL = 0.0005
-
-LOG_DIRECTORY = Path(
-    r"C:\Users\clive\OneDrive\Desktop\Serial Communication Data Packets"
-)
-
-
-def timestamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
-
-def format_bytes(data):
-    return ", ".join(f"0x{byte:02X}" for byte in data)
-
-
-def log_data(log_file, direction, data):
-    formatted_data = format_bytes(data)
-
-    line = (
-        f"[{timestamp()}] [{direction}] "
-        f"{len(data)} byte(s): {formatted_data}"
-    )
-
-    print(line, flush=True)
-    log_file.write(line + "\n")
-    log_file.flush()
-
-
-def open_serial_port(port_name):
-    return serial.Serial(
-        port=port_name,
-        baudrate=BAUD_RATE,
-        bytesize=serial.EIGHTBITS,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        timeout=0,
-        write_timeout=2,
-        xonxoff=False,
-        rtscts=False,
-        dsrdtr=False,
-    )
-
-
-def forward_complete_buffer(
-    buffer,
-    destination,
-    direction,
-    log_file,
-):
-    if not buffer:
-        return
-
-    # Convert the complete bytearray into one immutable bytes object.
-    complete_data = bytes(buffer)
-
-    # One write() call containing the complete buffer.
-    bytes_written = destination.write(complete_data)
-    destination.flush()
-
-    log_data(log_file, direction, complete_data)
-
-    print(
-        f"  -> Wrote complete {bytes_written}-byte buffer",
-        flush=True,
-    )
-
-    if bytes_written != len(complete_data):
-        raise serial.SerialTimeoutException(
-            f"Short write: expected {len(complete_data)} bytes, "
-            f"but wrote {bytes_written} bytes"
-        )
-
-    buffer.clear()
-
-
-def run_bridge():
-    LOG_DIRECTORY.mkdir(parents=True, exist_ok=True)
-
-    log_filename = (
-        LOG_DIRECTORY
-        / f"BridgeLog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    )
-
-    print(f"Logging to: {log_filename}")
-
-    try:
-        with open(
-            log_filename,
-            "a",
-            encoding="utf-8",
-            buffering=1,
-        ) as log_file:
-            with open_serial_port(ARDUINO2_PORT) as arduino2_serial, \
-                    open_serial_port(TOTAL_STATION_PORT) as station_serial:
-
-                print(
-                    f"Arduino 2 opened on {ARDUINO2_PORT}, "
-                    f"{BAUD_RATE} baud, 8-N-1"
-                )
-
-                print(
-                    f"Total station opened on {TOTAL_STATION_PORT}, "
-                    f"{BAUD_RATE} baud, 8-N-1"
-                )
-
-                print("Bridge started. Press Ctrl+C to stop.")
-
-                arduino_buffer = bytearray()
-                station_buffer = bytearray()
-
-                arduino_last_byte_time = None
-                station_last_byte_time = None
-
-                while True:
-                    now = time.monotonic()
-
-                    # -------------------------------------------------------
-                    # Arduino 2 -> Total station
-                    # -------------------------------------------------------
-
-                    arduino_waiting = arduino2_serial.in_waiting
-
-                    if arduino_waiting > 0:
-                        received = arduino2_serial.read(arduino_waiting)
-
-                        if received:
-                            arduino_buffer.extend(received)
-                            arduino_last_byte_time = time.monotonic()
-
-                    if (
-                        arduino_buffer
-                        and arduino_last_byte_time is not None
-                        and now - arduino_last_byte_time >= BUFFER_GAP
-                    ):
-                        forward_complete_buffer(
-                            arduino_buffer,
-                            station_serial,
-                            "ARDUINO2->TS",
-                            log_file,
-                        )
-
-                        arduino_last_byte_time = None
-
-                    # -------------------------------------------------------
-                    # Total station -> Arduino 2
-                    # -------------------------------------------------------
-
-                    station_waiting = station_serial.in_waiting
-
-                    if station_waiting > 0:
-                        received = station_serial.read(station_waiting)
-
-                        if received:
-                            station_buffer.extend(received)
-                            station_last_byte_time = time.monotonic()
-
-                    if (
-                        station_buffer
-                        and station_last_byte_time is not None
-                        and now - station_last_byte_time >= BUFFER_GAP
-                    ):
-                        forward_complete_buffer(
-                            station_buffer,
-                            arduino2_serial,
-                            "TS->ARDUINO2",
-                            log_file,
-                        )
-
-                        station_last_byte_time = None
-
-                    time.sleep(POLL_INTERVAL)
-
-    except KeyboardInterrupt:
-        print("\nStopped Arduino2 <-> Total Station bridge")
-
-    except serial.SerialException as error:
-        print(f"\nSerial error: {error}")
-
-    except OSError as error:
-        print(f"\nOperating-system error: {error}")
-
-
-def main():
     while True:
-        print("\n--- Menu ---")
-        print("30: Start Arduino2 <-> Total Station bridge")
-        print("1000: Exit program")
+        match status:
+            # Main Menu
+            case "0":
+                print("\n--- Menu ---")
+                print("30: Start Arduino2 <-> Total Station bridge")
+                print("1000: Exit program")
 
-        choice = input("Enter your choice: ").strip()
+                status = input("Enter your choice: ")
 
-        if choice == "30":
-            run_bridge()
+            # Bridge Arduino 2 (COM14) <-> Total Station (COM6)
+            # Read data from Arduino 2 and forward it to the Total Station.
+            # Read data from the Total Station and forward it back to Arduino 2.
+            case "30":
+                log_filename = f"C:/Users/clive/OneDrive/Desktop/Serial Communication Data Packets/BridgeLog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                print(f"Logging to: {log_filename}")
 
-        elif choice == "1000":
-            print("Exiting program")
-            break
+                try:
+                    with open(log_filename, "a") as log_file:
+                        while True:
+                            # Data coming from Arduino 2 -> forward to Total Station
+                            if arduinoSerial.in_waiting > 0:
+                                data = arduinoSerial.read(arduinoSerial.in_waiting)
 
-        else:
-            print("Invalid choice")
+                                formattedData = ", ".join(f"0x{b:02X}" for b in data)
+                                print("Data received from Arduino2:", formattedData)
 
+                                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                                line = f"[{timestamp}] [ARDUINO2->TS] {formattedData}"
+                                log_file.write(line + "\n")
+                                log_file.flush()
 
-if __name__ == "__main__":
-    main()
+                                totalStationSerial.write(data)
+
+                            # Data coming from Total Station -> forward to Arduino 2
+                            if totalStationSerial.in_waiting > 0:
+                                data = totalStationSerial.read(totalStationSerial.in_waiting)
+
+                                formattedData = ", ".join(f"0x{b:02X}" for b in data)
+                                print("Data received from Total Station:", formattedData)
+
+                                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                                line = f"[{timestamp}] [TS->ARDUINO2] {formattedData}"
+                                log_file.write(line + "\n")
+                                log_file.flush()
+
+                                arduinoSerial.write(data)
+
+                # When either serial connection is lost, break out of loop
+                except serial.SerialException:
+                    print("Serial connection lost.")
+                    break
+
+                # When Ctrl+C is pressed, return to the main menu
+                except KeyboardInterrupt:
+                    print("Stopped Arduino2 <-> Total Station bridge")
+                    status = "0"
+
+            # Exit the program
+            case "1000":
+                print("Exiting program")
+                break

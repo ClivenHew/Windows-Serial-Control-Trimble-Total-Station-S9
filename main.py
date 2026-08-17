@@ -3,7 +3,8 @@ import time
 import threading
 from datetime import datetime
 from pathlib import Path
-from init import init_trimble
+from BluetoothInit import bluetooth_init_trimble
+from RS232Init import rs232_init_trimble
 from backgroundStream import capture_stream
 from turnTotalStation import turn_total_station
 from setSearchWindow import set_search_window
@@ -91,6 +92,33 @@ correctionValues = {
     "trunnionAxis": None
 }
 
+#Select communication type once before starting the main loop
+while True:
+    print("\n--- Connection Type ---")
+    print("1: Bluetooth")
+    print("2: RS232")
+
+    connectionChoice = input("Select connection type: ").strip()
+
+    if connectionChoice == "1":
+        connectionType = "Bluetooth"
+        connectionBaudRate = 9600
+        break
+
+    elif connectionChoice == "2":
+        connectionType = "RS232"
+        connectionBaudRate = 115200
+        break
+
+    else:
+        print("Invalid choice. Enter 1 or 2.")
+
+
+print(
+    f"\nSelected connection: {connectionType}, "
+    f"{connectionBaudRate} baud"
+)
+
 #Start Main Loop
 while True:
     #Ask user to open com port
@@ -110,9 +138,10 @@ while True:
             trimbleSerial = None
 
             try:
+                #Bluetooth Serial Port Profile (SPP) settings
                 trimbleSerial = serial.Serial()
                 trimbleSerial.port = comPort
-                trimbleSerial.baudrate = 9600
+                trimbleSerial.baudrate = connectionBaudRate
                 trimbleSerial.timeout = 1
                 trimbleSerial.write_timeout = 2
 
@@ -176,14 +205,24 @@ while True:
                     case "0":
                         #If no serial communication
                         if status["trimbleConnection"] == False:
-                            #Perform initialization
-                            outcome = init_trimble(status = status,
-                                                logFile = logFile,
-                                                currentAngles = currentAngles,
-                                                turnTotalStation = turnTotalStation,
-                                                searchWindow = searchWindow,
-                                                correctionValues = correctionValues,
-                                                trimbleSerial = trimbleSerial)
+                            #Check bluetooth or RS232 connection type
+                            if connectionType == "Bluetooth":
+                                #Perform initialization
+                                outcome = bluetooth_init_trimble(status = status,
+                                                    logFile = logFile,
+                                                    currentAngles = currentAngles,
+                                                    turnTotalStation = turnTotalStation,
+                                                    searchWindow = searchWindow,
+                                                    correctionValues = correctionValues,
+                                                    trimbleSerial = trimbleSerial)
+                            elif connectionType == "RS232":
+                                outcome = rs232_init_trimble(status = status,
+                                                                logFile = logFile,
+                                                                currentAngles = currentAngles,
+                                                                turnTotalStation = turnTotalStation,
+                                                                searchWindow = searchWindow,
+                                                                correctionValues = correctionValues,
+                                                                trimbleSerial = trimbleSerial)
                             
                             #If successful initialization
                             if (outcome == True and status["trimbleConnection"] == True):
