@@ -397,7 +397,7 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                                 break
 
                             #If no challenge is found in data packet
-                            elif fail or fail2 in trimbleBuffer:
+                            elif fail in trimbleBuffer or fail2 in trimbleBuffer:
                                 print("Failed to request for challenge.\n")
 
                                 log_data(trimbleBuffer, logFile)
