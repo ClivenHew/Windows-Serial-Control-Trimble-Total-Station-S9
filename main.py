@@ -15,7 +15,6 @@ from setTargetMultiTrackSearchLock import set_target_multiTrack_searchLock
 from setTargetDirectReflex import set_target_directReflex
 from enableSearchLock import enable_search_lock
 from startSearch import start_search
-from startMultiTrackSearch import start_multitrack_search
 from stopSearch import stop_search
 from getMeasurements import get_measurements
 from changeFace import change_face
