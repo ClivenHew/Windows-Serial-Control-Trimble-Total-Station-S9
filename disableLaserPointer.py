@@ -55,5 +55,5 @@ def disable_laser_pointer(trimbleSerial, logFile, status):
         trimbleBuffer.clear()
         return False
     
-    # finally:
-    #     status["backgroundStreamEnabled"] = True
+    finally:
+        status["backgroundStreamEnabled"] = True

@@ -6,6 +6,7 @@ def get_measurements(status, logFile, trimbleSerial):
         commandTimeout = 10
 
         expectedResponse = (b"\x12\x08\x00\x02\x01\x69\x80\x00\xC0")
+        failResponse = (b"\x12\x08\x00\x02\x01\x69\x80\x57\xC0")
         commandBytes = [0x13, 0x08, 0x00, 0x01, 0x02, 0x69, 0x40, 0x02, 0xC0]
 
         trimbleBuffer = bytearray()
@@ -48,6 +49,13 @@ def get_measurements(status, logFile, trimbleSerial):
                 #Clear buffer
                 trimbleBuffer.clear()
                 return True
+
+            #Once fail response is found
+            if failResponse in trimbleBuffer:
+                log_data(trimbleBuffer, logFile)
+                #Clear buffer
+                trimbleBuffer.clear()
+                return False
             
     #If user forcibly interrupts (Ctrl + C)
     except KeyboardInterrupt:

@@ -1,7 +1,13 @@
 from logData import log_data
 
 
-def log_measurements(currentAngles, correctionValues, status, logFile):
+def log_measurements(
+    currentAngles,
+    correctionValues,
+    searchWindow,
+    status,
+    logFile
+):
     lines = []
 
     sighting = currentAngles["sighting"]
@@ -40,6 +46,20 @@ def log_measurements(currentAngles, correctionValues, status, logFile):
     lines.append(f"Face: {currentAngles['face']}")
     lines.append("")
     lines.append(f"Tilt Compensator: {status['tiltCompensator']}")
+    lines.append("")
+    lines.append("--- Search Window ---")
+
+    for label, key in (
+        ("X Axis (Horizontal)", "xAxis"),
+        ("Y Axis (Vertical)", "yAxis")
+    ):
+        value = searchWindow[key]
+
+        if value is None:
+            lines.append(f"{label}: N.A")
+        else:
+            lines.append(f"{label}: {value:.5f} degrees")
+
     lines.append("")
     lines.append("--- Correction Values ---")
 

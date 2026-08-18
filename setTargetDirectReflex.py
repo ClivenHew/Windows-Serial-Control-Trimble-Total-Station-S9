@@ -55,5 +55,5 @@ def set_target_directReflex(trimbleSerial, logFile, status):
         trimbleBuffer.clear()
         return False
     
-    #finally:
-        #status["backgroundStreamEnabled"] = True
+    finally:
+        status["backgroundStreamEnabled"] = True

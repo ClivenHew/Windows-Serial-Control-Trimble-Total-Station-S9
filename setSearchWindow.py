@@ -112,5 +112,5 @@ def set_search_window(trimbleSerial, logFile, currentAngles, searchWindow, statu
         responseBuffer.clear()
         return False
 
-    #finally:
-        #status["backgroundStreamEnabled"] = True
+    finally:
+        status["backgroundStreamEnabled"] = True

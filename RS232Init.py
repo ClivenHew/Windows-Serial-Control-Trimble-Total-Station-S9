@@ -1,6 +1,5 @@
 import time
 from logData import log_data
-from unescapeBytes import escape_bytes
 
 #Handshake payload to wake up the Trimble device.
 trimbleHandshake =  [
@@ -96,13 +95,9 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                     else:
                         #Reset all the variables
                         status["trimbleConnection"] = False
-                        status["prismTarget"] = False
-                        status["searchWindow"] = False
                         status["tiltCompensator"] = False
-                        status["searchLock"] = False
                         status["prismLocked"] = False
                         status["searchState"] = False
-                        status["powerSource"] = None
                         status["laserPointer"] = False
 
                         currentAngles["horizontalAngle"] = None
@@ -117,8 +112,6 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                         turnTotalStation["newVerticalAngle"] = None
                         turnTotalStation["newFace"] = None
                         turnTotalStation["inMovement"] = None
-                        turnTotalStation["angleTurnFlag"] = False
-                        turnTotalStation["faceTurnFlag"] = False
 
                         searchWindow["xAxis"] = 0
                         searchWindow["yAxis"] = 0
@@ -224,7 +217,7 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                                 break
                     
                 
-                                #Device Authentication 2
+                #Device Authentication 2
                 case 30:
                     print("Sending Device Authentication 2\n")
                     log_data(deviceAuthentication2, logFile)
@@ -342,8 +335,7 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                     #Check if success or failure
                     success = b'\x12\x0C\x00\x02\x01\xA0\x80\x00'
                     fail = b'\x12\x08\x00\x02\x01\xA0\x80\x62\xC0'
-                    fail62 = b'\x12\x08\x00\x02\x01\xA0\x80\x62\xC0'
-                    fail63 = b'\x12\x08\x00\x02\x01\xA0\x80\x63\xC0'
+                    fail2 = b'\x12\x08\x00\x02\x01\xA0\x80\x63\xC0'
 
                     #Set start time to current time
                     initializationStartTime = time.monotonic()
@@ -405,7 +397,7 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                                 break
 
                             #If no challenge is found in data packet
-                            elif fail in trimbleBuffer:
+                            elif fail or fail2 in trimbleBuffer:
                                 print("Failed to request for challenge.\n")
 
                                 log_data(trimbleBuffer, logFile)
@@ -413,23 +405,6 @@ def rs232_init_trimble(status, logFile, currentAngles, turnTotalStation, searchW
                                 #Clear buffer
                                 trimbleBuffer.clear()
                                 return False
-
-                            elif fail62 in trimbleBuffer or fail63 in trimbleBuffer:
-                                print("Challenge not ready yet. Retrying request for challenge.\n")
-                                log_data("Challenge not ready yet. Retrying request for challenge", logFile)
-                                log_data(trimbleBuffer, logFile)
-
-                                trimbleBuffer.clear()
-
-                                time.sleep(1)
-
-                                trimbleSerial.write(bytes(trimbleRequestChallenge))
-                                trimbleSerial.flush()
-
-                                initializationStartTime = time.monotonic()
-                                previousCountdown = None
-
-                                continue
                     
 
                 #Respond to challenge

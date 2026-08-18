@@ -2,7 +2,6 @@ import serial
 import time
 import threading
 from datetime import datetime
-from pathlib import Path
 from BluetoothInit import bluetooth_init_trimble
 from RS232Init import rs232_init_trimble
 from backgroundStream import capture_stream
@@ -44,17 +43,14 @@ deviceLogout3 = [
 
 status = {
     "trimbleConnection": False,
-    "searchWindow": False,
     "tiltCompensator": False,
-    "searchLock": False,
     "prismLocked": False,
     "searchState": False,
     "searchFailed": False,
     "laserPointer" : False,
     "backgroundStreamEnabled" : False,
     "targetType" : None,
-    "targetID" : None,
-    "powerSource" : None
+    "targetID" : None
 }
 
 #Store the current angles received from the Trimble device.
@@ -65,8 +61,7 @@ currentAngles = {
     "sighting": None,
     "trunnion": None,
     "slopeDistance": None,
-    "face": "Face 1",
-    "tiltCompensator": None
+    "face": "Face 1"
 }
 
 #Turn the Trimble device
@@ -79,8 +74,8 @@ turnTotalStation = {
 
 #Search window
 searchWindow = {
-    "xAxis" : None,
-    "yAxis" : None
+    "xAxis" : 0,
+    "yAxis" : 0
 }
 
 #Store the correction values received from the Trimble device.
@@ -102,7 +97,7 @@ while True:
 
     if connectionChoice == "1":
         connectionType = "Bluetooth"
-        connectionBaudRate = 9600
+        connectionBaudRate = 115200
         break
 
     elif connectionChoice == "2":
@@ -254,15 +249,18 @@ while True:
                         print("\n--- Menu ---")
                         print("100: Enable Tilt Compensator")
                         print("110: Disable Tilt Compensator")
-                        print("200: Print HA, VA, Sighting, Trunnion, adjustment HA")
-                        print("250: Get correction values")
-                        print("300: Set Target: Direct Reflex and enable laser pointer")
-                        print("400: Set Prism Target: PrismAdvanced, SearchLock, and begin search operation")
-                        print("500: Set Prism Target: MultiTrack, SearchLock, Prism ID, and begin search operation")
-                        print("600: Get Measurements")
-                        print("700: Set desired Horizontal Angle")
-                        print("800: Turn Total Station (Angles)")
-                        print("810: Change Face")
+                        print("120: Set Target: Direct Reflex")
+                        print("130: Enable Laser Pointer")
+                        print("140: Disable Laser Pointer")
+                        print("150: Set Search Window")
+                        print("160: Set Target: PrismAdvanced")
+                        print("170: Set Target: MultiTrack with Prism ID")
+                        print("180: Begin Search Operation")
+                        print("190: Get Measurements")
+                        print("200: Set desired Horizontal Angle")
+                        print("300: Turn Total Station (Angles)")
+                        print("310: Change Face")
+                        print("900: Print HA, VA, Sighting, Trunnion, adjustment HA")
                         print("999: Restart connection with Trimble device")
                         print("1000: Exit program")
 
@@ -285,6 +283,7 @@ while True:
                         if outcome == True:
                             print("Tilt compensator enabled.\n")
                             log_data("Tilt compensator enabled", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
                         
@@ -292,6 +291,7 @@ while True:
                         elif outcome == False:
                             print("Failed to enable tilt compensator.\n")
                             log_data("Failed to enable tilt compensator", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
                     
@@ -303,7 +303,6 @@ while True:
                             state = "0"
                             continue
 
-                        #Disable Tilt Compensator
                         outcome = disable_tilt_compensator(trimbleSerial = trimbleSerial,
                                                         logFile = logFile,
                                                         status = status)
@@ -312,6 +311,7 @@ while True:
                         if outcome == True:
                             print("Tilt compensator disabled.\n")
                             log_data("Tilt compensator disabled", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
                         
@@ -319,73 +319,16 @@ while True:
                         elif outcome == False:
                             print("Failed to disabled tilt compensator.\n")
                             log_data("Failed to disabled tilt compensator", logFile)
-                            #Go to main menu
-                            state = "10"
-                    
-                    
-                    #Print measurement variables
-                    case "200":
-                        if status["trimbleConnection"] == False:
-                            print("Serial communication is not yet established.\n")
-                            log_data("Serial communication is not yet established", logFile)
-                            state = "0"
-                            continue
-
-                        #Wait for 3 seconds to allow the latest readings
-                        time.sleep(3)
-
-                        #Check if at least one variable has updated in the background stream
-                        if currentAngles["horizontalAngle"] is None:
-                            print("Stream measurement has not yet been received.\n")
-                            log_data("Stream measurement has not yet been received", logFile)
-                            state = "10"
-                            continue
-
-                        #Print all readings
-                        log_measurements(
-                            currentAngles=currentAngles,
-                            correctionValues=correctionValues,
-                            status=status,
-                            logFile=logFile
-                        )
-
-                        #Go back to main menu
-                        state = "10"
-
-                    
-                    #Get correction values
-                    case "250":
-                        if status["trimbleConnection"] == False:
-                            print("Serial communication is not yet established.\n")
-                            log_data("Serial communication is not yet established", logFile)
-                            state = "0"
-                            continue
-
-                        outcome = get_correction_values(correctionValues = correctionValues,
-                                                        logFile = logFile,
-                                                        status = status, 
-                                                        trimbleSerial = trimbleSerial)
-                        
-                        #If successfully set target
-                        if outcome == True:
-                            print("Correction value successfully retrieved.\n")
-                            log_data("Correction value successfully retrieved", logFile)
-                            #Go to main menu
-                            state = "10"
-                        
-                        #If failed to set target
-                        elif outcome == False:
-                            print("Failed to retrieve correction values.\n")
-                            log_data("Failed to retrieve correction values", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
 
 
                     #Set Target: Direct Reflex
-                    case "300":
+                    case "120":
                         if status["trimbleConnection"] == False:
                             print("Serial communication is not yet established.\n")
-                            log_data("Correction value successfully retrieved", logFile)
+                            log_data("Serial communication is not yet established", logFile)
                             state = "0"
                             continue
                         
@@ -397,23 +340,32 @@ while True:
                         if outcome == True:
                             print("Target successfully set to Direct Reflex.\n")
                             log_data("Target successfully set to Direct Reflex", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
-                            state = "310"
+                            state = "10"
                         
                         #If failed to set target
                         elif outcome == False:
                             print("Target failed to set to Direct Reflex.\n")
                             log_data("Target failed to set to Direct Reflex", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
 
 
                     #Enable Laser Pointer
-                    case "310":
+                    case "130":
                         if status["trimbleConnection"] == False:
                             print("Serial communication is not yet established.\n")
                             log_data("Serial communication is not yet established", logFile)
                             state = "0"
+                            continue
+
+                        #Check if target is set to Direct Reflex before enabling laser pointer
+                        if status["targetType"] != "Direct Reflex":
+                            print("Laser pointer can only be enabled when target is set to Direct Reflex.\n")
+                            log_data("Laser pointer can only be enabled when target is set to Direct Reflex", logFile)
+                            state = "10"
                             continue
 
                         outcome = enable_laser_pointer(trimbleSerial = trimbleSerial,
@@ -424,6 +376,7 @@ while True:
                         if outcome == True:
                             print("Successfuly enabled laser pointer.\n")
                             log_data("Successfuly enabled laser pointer", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
                         
@@ -431,60 +384,85 @@ while True:
                         elif outcome == False:
                             print("Failed to enable laser pointer.\n")
                             log_data("Failed to enable laser pointer", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
 
 
-                    #Check if laser pointer is enabled
-                    case "400":
+                    #Disable Laser Pointer
+                    case "140":
                         if status["trimbleConnection"] == False:
                             print("Serial communication is not yet established.\n")
                             log_data("Serial communication is not yet established", logFile)
                             state = "0"
                             continue
 
-                        if (status["laserPointer"] == True):
-                            print("Laser pointer is enabled. Disable it first.\n")
-                            outcome = disable_laser_pointer(trimbleSerial = trimbleSerial,
-                                                            logFile = logFile,
-                                                            status = status)
-                            if outcome == True:
-                                print("Laser pointer disabled.\n")
-                                log_data("Laser pointer disabled", logFile)
-                                state = "405"
-                            else:
-                                print("Failed to disable laser pointer.\n")
-                                log_data("Failed to disable laser pointer", logFile)
-                                state = "10"
+                        outcome = disable_laser_pointer(trimbleSerial = trimbleSerial,
+                                                        logFile = logFile,
+                                                        status = status)
 
+                        if outcome == True:
+                            print("Laser pointer disabled.\n")
+                            log_data("Laser pointer disabled", logFile)
+                            time.sleep(1.5)
+                            state = "10"
                         else:
-                            print("Laser pointer was not enabled. Proceed to next step.\n")
-                            log_data("Laser pointer was not enabled. Proceed to next step", logFile)
-                            state = "405"
+                            print("Failed to disable laser pointer.\n")
+                            log_data("Failed to disable laser pointer", logFile)
+                            time.sleep(1.5)
+                            state = "10"
 
 
-                    #Stop any search operation first
-                    case "405":
-                        if status["trimbleConnection"] == False:
+                    #Set Search Window
+                    case "150":
+                        try:
+                            if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
                                 log_data("Serial communication is not yet established", logFile)
                                 state = "0"
                                 continue
 
-                        outcome = stop_search(trimbleSerial=trimbleSerial, logFile=logFile, status=status)
+                            if (currentAngles["horizontalAngle"] is None or currentAngles["verticalAngle"] is None):
+                                print("Background Stream not received yet.\n")
+                                log_data("Background Stream not received yet", logFile)
+                                state = "10"
+                                continue
 
-                        if outcome == True:
-                            status["prismLocked"] = False
-                            status["searchState"] = False
-                            state = "410"
-                        else:
-                            print("Failed to stop current active prism lock.\n")
-                            log_data("Failed to stop current active prism lock", logFile)
+                            searchWindow["xAxis"] = float(input("Enter horizontal angle window in degrees: "))
+                            searchWindow["yAxis"] = float(input("Enter vertical angle window in degrees: "))
+
+                            outcome = set_search_window(trimbleSerial = trimbleSerial,
+                                                        logFile = logFile,
+                                                        currentAngles = currentAngles,
+                                                        searchWindow = searchWindow,
+                                                        status = status)
+                            
+                            #If successfully set search window
+                            if outcome == True:
+                                print("Search window successfully configured.\n")
+                                log_data("Search window successfully configured", logFile)
+                                time.sleep(1.5)
+                                state = "10"
+                            
+                            #If fail to set search window
+                            elif outcome == False:
+                                print("Search window failed to be configured.\n")
+                                log_data("Search window failed to be configured", logFile)
+                                time.sleep(1.5)
+                                #Go to main menu
+                                state = "10"
+                        
+                        except ValueError as error:
+                            print(f"\nInvalid input: {error}")
+                            state = "10"
+                        
+                        except KeyboardInterrupt:
+                            print("\nStopped setting search window.")
                             state = "10"
 
 
-                    #Set Target: Prism Advanced, Search Lock
-                    case "410":
+                    #Set Target: PrismAdvanced
+                    case "160":
                         if status["trimbleConnection"] == False:
                             print("Serial communication is not yet established.\n")
                             log_data("Serial communication is not yet established", logFile)
@@ -499,223 +477,21 @@ while True:
                         if outcome == True:
                             print("Target successfully set to PrismAdvanced with SearchLock.\n")
                             log_data("Target successfully set to PrismAdvanced with SearchLock", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
-                            state = "420"
+                            state = "10"
                         
                         #If failed to set target
                         elif outcome == False:
                             print("Target failed to set to PrismAdvanced with SearchLock.\n")
                             log_data("Target failed to set to PrismAdvanced with SearchLock", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
-                    
-
-                    #Set Search Window
-                    case "420":
-                        try:
-                            if status["trimbleConnection"] == False:
-                                print("Serial communication is not yet established.\n")
-                                log_data("Serial communication is not yet established", logFile)
-                                state = "0"
-                                continue
-
-                            if (currentAngles["horizontalAngle"] is None or currentAngles["verticalAngle"] is None):
-                                print("Background Stream not received yet.\n")
-                                log_data("Background Stream not received yet", logFile)
-                                state = "10"
-                                continue
-
-                            searchWindow["xAxis"] = float(input("Enter horizontal angle window in degrees: "))
-                            searchWindow["yAxis"] = float(input("Enter vertical angle window in degrees: "))
-
-                            outcome = set_search_window(trimbleSerial = trimbleSerial,
-                                                        logFile = logFile,
-                                                        currentAngles = currentAngles,
-                                                        searchWindow = searchWindow,
-                                                        status = status)
-                            
-                            #If successfully set search window
-                            if outcome == True:
-                                print("Search window successfully configured.\n")
-                                log_data("Search window successfully configured", logFile)
-                                status["searchWindow"] = True
-                                state = "430"
-                            
-                            #If fail to set search window
-                            elif outcome == False:
-                                print("Search window failed to be configured.\n")
-                                log_data("Search window failed to be configured", logFile)
-                                status["searchWindow"] = False
-                                #Go to enable target search and searchlock operation
-                                state = "10"
-                        
-                        except ValueError as error:
-                            print(f"\nInvalid input: {error}")
-                            state = "10"
-                        
-                        except KeyboardInterrupt:
-                            print("\nStopped setting search window.")
-                            state = "10"
-                    
-
-                    #Enable target search and search lock operation
-                    case "430":
-                        try:
-                            if status["trimbleConnection"] == False:
-                                print("Serial communication is not yet established.\n")
-                                log_data("Serial communication is not yet established", logFile)
-                                state = "0"
-                                continue
-
-                            outcome = enable_search_lock(trimbleSerial = trimbleSerial,
-                                                        logFile = logFile,
-                                                        status = status)
-                            
-                            #If successfully enabled target search
-                            if outcome == True:
-                                print("Target search and search lock successfully enabled.\n")
-                                log_data("Target search and search lock successfully enabled", logFile)
-                                #Go to next step
-                                state = "440"
-                            
-                            #If failed to enable target search
-                            elif outcome == False:
-                                print("Target search and search lock failed.\n")
-                                log_data("Target search and search lock failed", logFile)
-                                #Go back to main menu
-                                state = "10"
-                        
-                        except KeyboardInterrupt:
-                            print("\nStopped enabling target search.")
-                            log_data("Stopped enabling target search", logFile)
-                            state = "10"
-                    
-
-                    #Start search operation
-                    case "440":
-                        try:
-                            if status["trimbleConnection"] == False:
-                                print("Serial communication is not yet established.\n")
-                                log_data("Serial communication is not yet established", logFile)
-                                state = "0"
-                                continue
-                            
-                            outcome = start_search(trimbleSerial = trimbleSerial,
-                                                logFile = logFile,
-                                                status = status)
-                            
-                            if outcome == True:
-                                print("Prism locked on.\n")
-                                log_data("Prism locked on", logFile)
-                                state = "450"
-                            
-                            elif outcome == False:
-                                print("Prism failed to be found. Cancelling search.\n")
-                                log_data("Prism failed to be found. Cancelling search", logFile)
-
-                                #Stop the search operation if total station is still in movement
-                                if status["searchState"] == True or status["searchFailed"] == True:
-                                    outcome2 = stop_search(trimbleSerial = trimbleSerial,
-                                                        logFile = logFile,
-                                                        status = status)
-                                    if outcome2 == True:
-                                        print("Search operation cancelled.\n")
-                                        log_data("Search operation cancelled", logFile)
-
-                                    else:
-                                        print("Failed to cancel search operation.\n")
-                                        log_data("Failed to cancel search operation", logFile)
-                                
-                                status["prismLocked"] = False
-                                status["searchState"] = False
-                                status["backgroundStreamEnabled"] = True
-
-                                state = "10"
-                        
-                        except KeyboardInterrupt:
-                            print("\nSearchLock monitoring stopped.")
-                            state = "10"
 
 
-                    #Get angle and distance measurements
-                    case "450":
-                        try:
-                            if status["trimbleConnection"] == False:
-                                print("Serial communication is not yet established.\n")
-                                log_data("Serial communication is not yet established", logFile)
-                                state = "0"
-                                continue
-
-                            outcome = get_measurements(trimbleSerial = trimbleSerial,
-                                                    logFile = logFile,
-                                                    status = status)
-
-                            if outcome == True:
-                                print("Angle and Distance measurements retrieved.\n")
-                                log_data("Angle and Distance measurements retrieved", logFile)
-                                state = "10"
-                            
-                            elif outcome == False:
-                                print("Angle and Distance measurements failed to receive.\n")
-                                log_data("Angle and Distance measurements failed to receive", logFile)
-                                state = "10"
-
-                        except KeyboardInterrupt:
-                            print("\nStopped retrieving angle and distance measurements.")
-                            log_data("Stopped retrieving angle and distance measurements", logFile)
-                            state = "10"
-
-
-                    #Check if laser pointer is enabled
-                    case "500":
-                        if status["trimbleConnection"] == False:
-                            print("Serial communication is not yet established.\n")
-                            log_data("Serial communication is not yet established", logFile)
-                            state = "0"
-                            continue
-
-                        if (status["laserPointer"] == True):
-                            print("Laser pointer is enabled. Disable it first.\n")
-                            outcome = disable_laser_pointer(trimbleSerial = trimbleSerial,
-                                                            logFile = logFile,
-                                                            status = status)
-                            if outcome == True:
-                                print("Laser pointer disabled.\n")
-                                log_data("Laser pointer disabled", logFile)
-                                state = "505"
-                            else:
-                                print("Failed to disable laser pointer.\n")
-                                log_data("Failed to disable laser pointer", logFile)
-                                state = "10"
-
-                        else:
-                            print("Laser pointer was not enabled. Proceed to next step.\n")
-                            log_data("Laser pointer was not enabled. Proceed to next step", logFile)
-                            state = "505"
-
-
-                    #Stop any search operation first
-                    case "505":
-                        if status["trimbleConnection"] == False:
-                                print("Serial communication is not yet established.\n")
-                                log_data("Serial communication is not yet established", logFile)
-                                state = "0"
-                                continue
-
-                        outcome = stop_search(trimbleSerial=trimbleSerial, logFile=logFile, status=status)
-
-                        if outcome == True:
-                            status["prismLocked"] = False
-                            status["searchState"] = False
-                            state = "510"
-                        else:
-                            print("Failed to stop current active prism lock.\n")
-                            log_data("Failed to stop current active prism lock", logFile)
-                            state = "10"
-                    
-
-                    #Set Target: Multi Track, Search Lock
-                    case "510":
+                    #Set Target: MultiTrack with Prism ID
+                    case "170":
                         if status["trimbleConnection"] == False:
                             print("Serial communication is not yet established.\n")
                             log_data("Serial communication is not yet established", logFile)
@@ -730,66 +506,41 @@ while True:
                         if outcome == True:
                             print("Target successfully set to MultiTrack with SearchLock.\n")
                             log_data("Target successfully set to MultiTrack with SearchLock", logFile)
-                            state = "520"
+                            time.sleep(1.5)
+                            state = "10"
                         
                         #If failed to set target
                         elif outcome == False:
                             print("Target failed to set to PrismAdvanced with SearchLock.\n")
                             log_data("Target failed to set to PrismAdvanced with SearchLock", logFile)
+                            time.sleep(1.5)
                             #Go to main menu
                             state = "10"
 
 
-                    #Set Search Window
-                    case "520":
-                        try:
-                            if status["trimbleConnection"] == False:
-                                print("Serial communication is not yet established.\n")
-                                log_data("Serial communication is not yet established", logFile)
-                                state = "0"
-                                continue
+                    #Stop any search operation first
+                    case "180":
+                        if status["trimbleConnection"] == False:
+                            print("Serial communication is not yet established.\n")
+                            log_data("Serial communication is not yet established", logFile)
+                            state = "0"
+                            continue
 
-                            if (currentAngles["horizontalAngle"] is None or currentAngles["verticalAngle"] is None):
-                                print("Background Stream not received yet.\n")
-                                log_data("Background Stream not received yet", logFile)
-                                state = "10"
-                                continue
+                        outcome = stop_search(trimbleSerial=trimbleSerial, logFile=logFile, status=status)
 
-                            searchWindow["xAxis"] = float(input("Enter horizontal angle window in degrees: "))
-                            searchWindow["yAxis"] = float(input("Enter vertical angle window in degrees: "))
-
-                            outcome = set_search_window(trimbleSerial = trimbleSerial,
-                                                        logFile = logFile,
-                                                        currentAngles = currentAngles,
-                                                        searchWindow = searchWindow,
-                                                        status = status)
-                            
-                            #If successfully set search window
-                            if outcome == True:
-                                print("Search window successfully configured.\n")
-                                log_data("Search window successfully configured", logFile)
-                                status["searchWindow"] = True
-                                state = "530"
-                            
-                            #If fail to set search window
-                            elif outcome == False:
-                                print("Search window failed to be configured.\n")
-                                log_data("Search window failed to be configured", logFile)
-                                status["searchWindow"] = False
-                                #Go to enable target search and searchlock operation
-                                state = "10"
-                        
-                        except ValueError as error:
-                            print(f"\nInvalid input: {error}")
+                        if outcome == True:
+                            status["prismLocked"] = False
+                            status["searchState"] = False
+                            time.sleep(1.5)
+                            state = "183"
+                        else:
+                            print("Failed to stop current active prism lock.\n")
+                            log_data("Failed to stop current active prism lock", logFile)
+                            time.sleep(1.5)
                             state = "10"
-                        
-                        except KeyboardInterrupt:
-                            print("\nStopped setting search window.")
-                            state = "10"
-                    
 
-                    #Enable target search and search lock operation
-                    case "530":
+                    case "183":
+                        #Enable target search and search lock operation
                         try:
                             if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
@@ -805,13 +556,15 @@ while True:
                             if outcome == True:
                                 print("Target search and search lock successfully enabled.\n")
                                 log_data("Target search and search lock successfully enabled", logFile)
+                                time.sleep(1.5)
                                 #Go to next step
-                                state = "540"
+                                state = "185"
                             
                             #If failed to enable target search
                             elif outcome == False:
                                 print("Target search and search lock failed.\n")
                                 log_data("Target search and search lock failed", logFile)
+                                time.sleep(1.5)
                                 #Go back to main menu
                                 state = "10"
                         
@@ -820,28 +573,36 @@ while True:
                             log_data("Stopped enabling target search", logFile)
                             state = "10"
 
-
                     #Start search operation
-                    case "540":
+                    case "185":
                         try:
                             if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
                                 log_data("Serial communication is not yet established", logFile)
                                 state = "0"
                                 continue
+
+                            #Check that search window has been set beyond 2 degrees HA and VA
+                            if (searchWindow["xAxis"] < 2 or searchWindow["yAxis"] < 2):
+                                print("Search window must be set to at least 2 degrees for both HA and VA.\n")
+                                log_data("Search window must be set to at least 2 degrees for both HA and VA", logFile)
+                                time.sleep(1.5)
+                                state = "10"
+                                continue
                             
-                            outcome = start_multitrack_search(trimbleSerial = trimbleSerial,
-                                                              logFile = logFile,
-                                                              status = status)
+                            outcome = start_search(trimbleSerial = trimbleSerial,
+                                                logFile = logFile,
+                                                status = status)
                             
                             if outcome == True:
-                                print("Active Prism locked on.\n")
-                                log_data("Active Prism locked on", logFile)
-                                state = "450"
+                                print("Prism locked on.\n")
+                                log_data("Prism locked on", logFile)
+                                time.sleep(1.5)
+                                state = "10"
                             
                             elif outcome == False:
-                                print("Active Prism failed to be found. Cancelling search.\n")
-                                log_data("Active Prism failed to be found. Cancelling search", logFile)
+                                print("Prism failed to be found. Cancelling search.\n")
+                                log_data("Prism failed to be found. Cancelling search", logFile)
 
                                 #Stop the search operation if total station is still in movement
                                 if status["searchState"] == True or status["searchFailed"] == True:
@@ -851,24 +612,40 @@ while True:
                                     if outcome2 == True:
                                         print("Search operation cancelled.\n")
                                         log_data("Search operation cancelled", logFile)
+                                        status["prismLocked"] = False
+                                        status["searchState"] = False
+                                        status["backgroundStreamEnabled"] = True
+        
+                                        time.sleep(1.5)
+                                        state = "10"
 
                                     else:
-                                        print("Failed to cancel search operation.\n")
-                                        log_data("Failed to cancel search operation", logFile)
-                                
-                                status["prismLocked"] = False
-                                status["searchState"] = False
-                                status["backgroundStreamEnabled"] = True
+                                        print("Failed to cancel search operation. Restarting total station.\n")
+                                        log_data("Failed to cancel search operation. Restarting total station", logFile)
+                                        #Restart total station
+                                        status["trimbleConnection"] = False
+                                        time.sleep(1.5)
+                                        state = "999"
+                                        continue
 
-                                state = "10"
+                                #If total station is not in movement, go back to main menu
+                                else:
+                                    print("Search operation cancelled.\n")
+                                    log_data("Search operation cancelled", logFile)
+                                    status["prismLocked"] = False
+                                    status["searchState"] = False
+                                    status["backgroundStreamEnabled"] = True
+                                    time.sleep(1.5)
+                                    state = "10"
                         
                         except KeyboardInterrupt:
                             print("\nSearchLock monitoring stopped.")
+                            time.sleep(1.5)
                             state = "10"
 
 
                     #Get angle and distance measurements
-                    case "600":
+                    case "190":
                         try:
                             if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
@@ -883,17 +660,19 @@ while True:
                                 continue
 
                             outcome = get_measurements(trimbleSerial = trimbleSerial,
-                                                    logFile = logFile,
-                                                    status = status)
+                                                        logFile = logFile,
+                                                        status = status)
 
                             if outcome == True:
                                 print("Angle and Distance measurements retrieved.\n")
                                 log_data("Angle and Distance measurements retrieved", logFile)
+                                time.sleep(1.5)
                                 state = "10"
                             
                             elif outcome == False:
-                                print("Angle and Distance measurements failed to receive.\n")
-                                log_data("Angle and Distance measurements failed to receive", logFile)
+                                print("Angle and Distance measurements failed to be retrieved.\n")
+                                log_data("Angle and Distance measurements failed to be retrieved", logFile)
+                                time.sleep(1.5)
                                 state = "10"
 
                         except KeyboardInterrupt:
@@ -901,9 +680,9 @@ while True:
                             log_data("Stopped retrieving angle and distance measurements", logFile)
                             state = "10"
 
-
-                    #Set desired HA
-                    case "700":
+                    
+                    #Set desired horizontal angle
+                    case "200":
                         try:
                             if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
@@ -934,18 +713,22 @@ while True:
                                 print("Failed to update HA adjustment.\n")
                                 log_data("Failed to update HA adjustment", logFile)
 
+                            time.sleep(1.5)
                             state = "10"
 
                         except ValueError as error:
                             print(f"\nInvalid input: {error}")
+                            time.sleep(1.5)
                             state = "10"
 
                         except KeyboardInterrupt:
                             print("\nStopped setting HA adjustment.")
+                            time.sleep(1.5)
                             state = "10"
 
+
                     #Turn total station to target HA/VA
-                    case "800":
+                    case "300":
                         try:
                             if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
@@ -969,20 +752,25 @@ while True:
                             if outcome == True:
                                 print("Total Station has turned to desired angles.\n")
                                 log_data("Total Station has turned to desired angles", logFile)
+                                time.sleep(1.5)
+                                state = "10"
+
                             else:
-                                print("Total Station did not turn to desired angles.\n")
-                                log_data("Total Station did not turn to desired angles", logFile)
-                            
-                            state = "10"
+                                print("Total Station did not turn to desired angles. Restarting total station.\n")
+                                log_data("Total Station did not turn to desired angles. Restarting total station.", logFile)
+                                time.sleep(1.5)
+                                state = "999"
+                                continue
                         
                         except KeyboardInterrupt:
                             print("\nStopped turning total station.")
                             log_data("Stopped turning total station", logFile)
+                            time.sleep(1.5)
                             state = "10"
 
 
                     # Change Face
-                    case "810":
+                    case "310":
                         try:
                             if status["trimbleConnection"] == False:
                                 print("Serial communication is not yet established.\n")
@@ -1001,15 +789,53 @@ while True:
                             if outcome:
                                 print("Face changed successfully.\n")
                                 log_data("Face changed successfully", logFile)
-                            else:
-                                print("Face change failed.\n")
-                                log_data("Face change failed", logFile)
+                                time.sleep(1.5)
+                                state = "10"
 
-                            state = "10"
+                            else:
+                                print("Face change failed. Restarting total station.\n")
+                                log_data("Face change failed. Restarting total station.", logFile)
+                                time.sleep(1.5)
+                                state = "999"
+                                continue
 
                         except KeyboardInterrupt:
                             print("\nStopped changing face.")
+                            log_data("Stopped changing face.", logFile)
+                            time.sleep(1.5)
                             state = "10"
+
+
+                    #Print measurement variables
+                    case "900":
+                        if status["trimbleConnection"] == False:
+                            print("Serial communication is not yet established.\n")
+                            log_data("Serial communication is not yet established", logFile)
+                            state = "0"
+                            continue
+
+                        #Wait for 3 seconds to allow the latest readings
+                        time.sleep(3)
+
+                        #Check if at least one variable has updated in the background stream
+                        if currentAngles["horizontalAngle"] is None:
+                            print("Stream measurement has not yet been received.\n")
+                            log_data("Stream measurement has not yet been received", logFile)
+                            state = "10"
+                            continue
+
+                        #Print all readings
+                        log_measurements(
+                            currentAngles=currentAngles,
+                            correctionValues=correctionValues,
+                            searchWindow=searchWindow,
+                            status=status,
+                            logFile=logFile
+                        )
+
+                        time.sleep(1.5)
+                        #Go back to main menu
+                        state = "10"
 
 
                     #Restart connection
@@ -1018,15 +844,11 @@ while True:
                         log_data("Restart connection with Trimble device", logFile)
 
                         status["trimbleConnection"] = False
-                        status["prismTarget"] = False
-                        status["searchWindow"] = False
                         status["tiltCompensator"] = False
                         status["targetType"] = None
                         status["targetID"] = None
-                        status["searchLock"] = False
                         status["prismLocked"] = False
                         status["searchState"] = False
-                        status["powerSource"] = None
 
                         currentAngles["horizontalAngle"] = None
                         currentAngles["verticalAngle"] = None
@@ -1036,12 +858,13 @@ while True:
                         currentAngles["slopeDistance"] = None
                         currentAngles["face"] = "Face 1"
 
+                        searchWindow["xAxis"] = 0
+                        searchWindow["yAxis"] = 0
+
                         turnTotalStation["newHorizontalAngle"] = None
                         turnTotalStation["newVerticalAngle"] = None
                         turnTotalStation["newFace"] = None
                         turnTotalStation["inMovement"] = None
-                        turnTotalStation["angleTurnFlag"] = False
-                        turnTotalStation["faceTurnFlag"] = False
 
                         try:
                             trimbleSerial.write(bytes(deviceLogout1))

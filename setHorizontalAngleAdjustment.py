@@ -69,11 +69,6 @@ def set_ha_adjustment(trimbleSerial, logFile, desiredHA, currentAngles, status):
 
             trimbleBuffer.extend(trimbleSerial.read(trimbleSerial.in_waiting))
 
-            # Maintain the heartbeat while waiting.
-            # if b"\xFF\xC0" in trimbleBuffer:
-            #     trimbleSerial.write(b"\xFF\xC0")
-            #     trimbleSerial.flush()
-
             if expectedResponse in trimbleBuffer:
                 currentAngles["horizontalAngleAdjustment"] = adjustmentDegrees
                 log_data(trimbleBuffer, logFile)
