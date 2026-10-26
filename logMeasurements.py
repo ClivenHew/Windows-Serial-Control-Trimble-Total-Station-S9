@@ -89,16 +89,32 @@ def log_measurements(
 
 
 #Save one indexed, timestamped measurement to S9 HP Measurements.txt
-def save_measurement_to_file(currentAngles, status, timeout = 5.0):
-    #Wait for the background stream to deliver the new slope distance
+def save_measurement_to_file(currentAngles, status, previousDistance, timeout = 10.0):
+    #Wait until the stream reports a new distance that is stable over consecutive packets
     startTime = time.monotonic()
-    while currentAngles["slopeDistance"] is None:
-        if time.monotonic() - startTime > timeout:
-            print("No slope distance received. Measurement not saved.\n")
-            return False
-        time.sleep(0.05)
+    lastValue = None
+    stableCount = 0
 
-    time.sleep(0.2)
+    while True:
+        if time.monotonic() - startTime > timeout:
+            print("No new slope distance received. Measurement not saved.\n")
+            return False
+
+        value = currentAngles["slopeDistance"]
+
+        if value is not None and value != previousDistance:
+            if value == lastValue:
+                stableCount += 1
+            else:
+                stableCount = 0
+            lastValue = value
+
+            #Same new value seen 3 times in a row
+            if stableCount >= 2:
+                break
+
+        time.sleep(0.1)
+
     measurement = dict(currentAngles)
 
     os.makedirs(measurementDirectory, exist_ok = True)

@@ -24,6 +24,7 @@ from enableLaserPointer import enable_laser_pointer
 from disableLaserPointer import disable_laser_pointer
 from logData import log_data
 from logMeasurements import log_measurements, save_measurement_to_file
+from calculateResection import calculate_total_station_coordinates
 
 logFileName = f"C:/Users/clive/OneDrive/Desktop/Serial Communication Data Packets/TrimbleLog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
@@ -260,6 +261,7 @@ while True:
                         print("200: Set desired Horizontal Angle")
                         print("300: Turn Total Station (Angles)")
                         print("310: Change Face")
+                        print("400: Calculate Total Station Coordinates")
                         print("900: Print HA, VA, Sighting, Trunnion, adjustment HA")
                         print("999: Restart connection with Trimble device")
                         print("1000: Exit program")
@@ -660,7 +662,7 @@ while True:
                                 continue
 
                             #Reset slope distance to None to ensure a new measurement is received
-                            currentAngles["slopeDistance"] = None
+                            previousDistance = currentAngles["slopeDistance"]
 
                             outcome = get_measurements(trimbleSerial = trimbleSerial,
                                                         logFile = logFile,
@@ -669,7 +671,7 @@ while True:
                             if outcome == True:
                                 print("Angle and Distance measurements retrieved.\n")
                                 log_data("Angle and Distance measurements retrieved", logFile)
-                                save_measurement_to_file(currentAngles, status)
+                                save_measurement_to_file(currentAngles, status, previousDistance)
                                 time.sleep(1.5)
                                 state = "10"
                             
@@ -807,6 +809,28 @@ while True:
                             print("\nStopped changing face.")
                             log_data("Stopped changing face.", logFile)
                             time.sleep(1.5)
+                            state = "10"
+
+
+                    #Resection
+                    case "400":
+                        try:
+                            outcome = calculate_total_station_coordinates()
+
+                            if outcome == True:
+                                log_data("Total station coordinates calculated", logFile)
+                            else:
+                                log_data("Total station coordinates calculation failed", logFile)
+
+                            time.sleep(1.5)
+                            state = "10"
+
+                        except ValueError as error:
+                            print(f"\nCalculation error: {error}\n")
+                            state = "10"
+
+                        except KeyboardInterrupt:
+                            print("\nStopped calculating total station coordinates.")
                             state = "10"
 
 
