@@ -1,3 +1,4 @@
+import os
 import serial
 import time
 import threading
@@ -22,7 +23,7 @@ from getCorrectionValues import get_correction_values
 from enableLaserPointer import enable_laser_pointer
 from disableLaserPointer import disable_laser_pointer
 from logData import log_data
-from logMeasurements import log_measurements
+from logMeasurements import log_measurements, save_measurement_to_file
 
 logFileName = f"C:/Users/clive/OneDrive/Desktop/Serial Communication Data Packets/TrimbleLog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
@@ -658,6 +659,9 @@ while True:
                                 state = "0"
                                 continue
 
+                            #Reset slope distance to None to ensure a new measurement is received
+                            currentAngles["slopeDistance"] = None
+
                             outcome = get_measurements(trimbleSerial = trimbleSerial,
                                                         logFile = logFile,
                                                         status = status)
@@ -665,6 +669,7 @@ while True:
                             if outcome == True:
                                 print("Angle and Distance measurements retrieved.\n")
                                 log_data("Angle and Distance measurements retrieved", logFile)
+                                save_measurement_to_file(currentAngles, status)
                                 time.sleep(1.5)
                                 state = "10"
                             
@@ -828,8 +833,7 @@ while True:
                             currentAngles=currentAngles,
                             correctionValues=correctionValues,
                             searchWindow=searchWindow,
-                            status=status,
-                            logFile=logFile
+                            status=status
                         )
 
                         time.sleep(1.5)

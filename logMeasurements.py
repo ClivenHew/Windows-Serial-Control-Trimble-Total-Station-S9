@@ -1,12 +1,17 @@
-from logData import log_data
+import os
+import time
+from datetime import datetime
+
+
+measurementDirectory = r"C:\Users\clive\OneDrive\Desktop\Serial Communication Data Packets\Measurements"
+measurementFilePath = os.path.join(measurementDirectory, "S9 HP Measurements.txt")
 
 
 def log_measurements(
     currentAngles,
     correctionValues,
     searchWindow,
-    status,
-    logFile
+    status
 ):
     lines = []
 
@@ -79,6 +84,57 @@ def log_measurements(
 
     for line in lines:
         print(line)
-        log_data(line, logFile)
 
     print()
+
+
+#Save one indexed, timestamped measurement to S9 HP Measurements.txt
+def save_measurement_to_file(currentAngles, status, timeout = 5.0):
+    #Wait for the background stream to deliver the new slope distance
+    startTime = time.monotonic()
+    while currentAngles["slopeDistance"] is None:
+        if time.monotonic() - startTime > timeout:
+            print("No slope distance received. Measurement not saved.\n")
+            return False
+        time.sleep(0.05)
+
+    time.sleep(0.2)
+    measurement = dict(currentAngles)
+
+    os.makedirs(measurementDirectory, exist_ok = True)
+
+    #Continue numbering from the last index in the file
+    index = 1
+    if os.path.isfile(measurementFilePath):
+        with open(measurementFilePath, "r", encoding = "utf-8") as measurementFile:
+            for line in measurementFile:
+                firstField = line.split(",", 1)[0].strip()
+                if firstField.isdigit():
+                    index = int(firstField) + 1
+
+    newFile = (not os.path.isfile(measurementFilePath)
+               or os.path.getsize(measurementFilePath) == 0)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    haAdjustment = measurement["horizontalAngleAdjustment"] or 0.0
+
+    entry = (f"{index},{timestamp},"
+             f"{measurement['horizontalAngle']:.5f},"
+             f"{measurement['verticalAngle']:.5f},"
+             f"{measurement['slopeDistance']:.5f},"
+             f"{haAdjustment:.5f},"
+             f"{measurement['face']},"
+             f"{measurement['sighting']:.5f},"
+             f"{measurement['trunnion']:.5f},"
+             f"{status['targetType']},{status['targetID']}")
+
+    with open(measurementFilePath, "a", encoding = "utf-8") as measurementFile:
+        if newFile:
+            measurementFile.write("Index,Timestamp,HA (deg),VA (deg),SD (m),"
+                                  "HA Adjustment (deg),Face,Sighting (deg),"
+                                  "Trunnion (deg),Target Type,Target ID\n")
+        measurementFile.write(entry + "\n")
+
+    print(f"Measurement #{index} saved: HA = {measurement['horizontalAngle']:.5f}, "
+          f"VA = {measurement['verticalAngle']:.5f}, SD = {measurement['slopeDistance']:.5f} m")
+    return True

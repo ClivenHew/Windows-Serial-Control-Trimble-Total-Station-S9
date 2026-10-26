@@ -3,8 +3,8 @@ import time
 from datetime import datetime
 
 # --- Port configuration ---
-ARDUINO2_PORT = 'COM14'      # Arduino 2 (relay from Arduino 1 / SDK chain)
-TOTAL_STATION_PORT = 'COM6'  # Leica total station
+ARDUINO2_PORT = 'COM10'      # Arduino 2 (relay from Arduino 1 / SDK chain)
+TOTAL_STATION_PORT = 'COM13'  # Leica total station
 ARDUINO2_BAUD_RATE = 9600    # Must match the Arduino2 sketch
 TOTAL_STATION_BAUD_RATE = 115200
 
